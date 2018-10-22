@@ -1,38 +1,45 @@
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import KFold, cross_val_score
+from sklearn.model_selection import KFold, cross_val_score, GridSearchCV
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import SVC
 from matplotlib import pyplot as plt
+import numpy as np
+import scipy as sp
+from sys import exit
 
-c_range = [pow(10, x) for x in range(-5, 6)]
+grid = {'C': np.power(10.0, np.arange(-5, 6))}
 print("[INFO] data loading")
 newsgroups = fetch_20newsgroups(subset='all', 
                           categories=["alt.atheism", "sci.space"])
 
 vectorizer = TfidfVectorizer()
 features = vectorizer.fit_transform(newsgroups.data)
+#labels = vectorizer.transform(newsgroups.target)
 labels = newsgroups.target
-print(labels)
-cv_scores = []
+features_names = np.array(vectorizer.get_feature_names())
+vocab = vectorizer.vocabulary_
 print("[INFO] svm works")
-for C in c_range:
-    svm = SVC(C=C, kernel='linear', random_state=241)
-    kf = KFold(n_splits=5, random_state=241)
-    scores = cross_val_score(svm, features, labels, cv=kf, scoring='accuracy')
-    cv_scores.append(scores.mean())
-
-print("[INFO] optimC found, fitting on svm")
-optimC = c_range[cv_scores.index(max(cv_scores))]
-print(optimC)
-svm = SVC(C=optimC, kernel='linear', random_state=241)
+#svm = SVC(kernel='linear', random_state=241)
+#kf = KFold(n_splits=5, random_state=241)
+#gs = GridSearchCV(svm, grid, scoring='accuracy', cv=kf, verbose=1)
+#scores = cross_val_score(svm, features, labels, cv=kf, scoring='accuracy')
+#cv_scores.append(scores.mean())
+#gs.fit(features, labels)
+#print("[INFO] fit on svm with best parameters C")
+svm = SVC(kernel='linear', random_state=241, C=10)
 svm.fit(features, labels)
-best_10 = []
-for (x, y), z in svm.coef_[:10]:
-    best_10.append(newsgroups.data[y])
-print(best_10)
+cx = sp.sparse.coo_matrix(svm.coef_)
+coef = {}
+for _, integer, value  in zip(cx.row, cx.col, cx.data):
+    coef[integer] = abs(value)
 
-print(c_range[cv_scores.index(max(cv_scores))], max(cv_scores))
-#plt.plot([pow(10, x) for x in range(-5, 6)], cv_scores)
-#plt.show()
+indices = [x[0] for x in sorted(coef.items(), key=lambda x: x[1])[-10:]]
+words = []
+for word, integer in vectorizer.vocabulary_.items():
+    if integer in indices:
+        words.append(word)
+print(sorted(words))
+with open('file', 'w') as f:
+    f.write(','.join(sorted(words)))
 
